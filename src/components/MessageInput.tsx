@@ -43,20 +43,10 @@ export default function MessageInput({ onSend, disabled }: MessageInputProps) {
   const { status, errorMessage, isRecording, start, stop, isSupported } =
     useVoiceInput({
       lang: 'zh-TW',
-      onResult: (recognizedText, isFinal) => {
-        setText((prev) => {
-          // For interim results, replace trailing interim text.
-          // For final results, append to existing text.
-          if (isFinal) {
-            const combined = prev + (prev && !prev.endsWith(' ') ? ' ' : '') + recognizedText;
-            return combined;
-          }
-          return recognizedText;
-        });
-        if (isFinal) {
-          // Focus textarea after final result so user can review/send
-          requestAnimationFrame(() => textareaRef.current?.focus());
-        }
+      onResult: (recognizedText) => {
+        setText(recognizedText);
+        autoResize();
+        requestAnimationFrame(() => textareaRef.current?.focus());
       },
     });
 

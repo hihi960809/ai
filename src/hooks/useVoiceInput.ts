@@ -30,7 +30,6 @@ export function useVoiceInput({
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const onResultRef = useRef(onResult);
 
-  // Keep callback ref fresh without re-creating recognition
   useEffect(() => {
     onResultRef.current = onResult;
   }, [onResult]);
@@ -40,7 +39,6 @@ export function useVoiceInput({
     (window.SpeechRecognition !== undefined ||
       window.webkitSpeechRecognition !== undefined);
 
-  // Initialize recognition lazily
   const getRecognition = useCallback((): SpeechRecognition | null => {
     if (recognitionRef.current) return recognitionRef.current;
 
@@ -49,32 +47,25 @@ export function useVoiceInput({
 
     const recognition = new Ctor();
     recognition.lang = lang;
-    recognition.continuous = true;
+    recognition.continuous = false;
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
-      let interimText = '';
-      let finalText = '';
-
+      let transcript = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i];
-        const transcript = result.item(0)?.transcript ?? '';
-        if (result.isFinal) {
-          finalText += transcript;
-        } else {
-          interimText += transcript;
-        }
+        transcript += event.results[i][0].transcript;
       }
 
-      if (finalText) {
-        onResultRef.current?.(finalText.trim(), true);
-      } else if (interimText) {
-        onResultRef.current?.(interimText.trim(), false);
+      if (transcript) {
+        const isFinal = event.results[event.results.length - 1].isFinal;
+        onResultRef.current?.(transcript, isFinal);
       }
     };
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      console.log('[SpeechRecognition] onerror:', event.error, event.message);
+
       let msg: string;
       switch (event.error) {
         case 'not-allowed':
@@ -101,8 +92,12 @@ export function useVoiceInput({
     };
 
     recognition.onend = () => {
-      // If still in recording state, recognition stopped unexpectedly
+      console.log('[SpeechRecognition] onend');
       setStatus((prev) => (prev === 'recording' ? 'idle' : prev));
+    };
+
+    recognition.onstart = () => {
+      console.log('[SpeechRecognition] onstart');
     };
 
     recognitionRef.current = recognition;
@@ -129,7 +124,6 @@ export function useVoiceInput({
       recognition.start();
       setStatus('recording');
     } catch {
-      // start() throws if already started — stop then retry
       try {
         recognition.abort();
         recognition.start();
@@ -153,7 +147,6 @@ export function useVoiceInput({
     setStatus('idle');
   }, []);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       const recognition = recognitionRef.current;
