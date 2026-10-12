@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { Character, Message } from '../types';
+import SpeakButton from './SpeakButton';
 
 interface ChatWindowProps {
   character: Character;
@@ -117,15 +118,22 @@ function MessageBubble({
             }
           `}
         >
-          {message.text}
+          <div className="flex items-start gap-2">
+            <span className="flex-1">{message.text}</span>
+            {!isUser && (
+              <SpeakButton text={message.text} lang="zh-TW" />
+            )}
+          </div>
         </div>
-        <p
-          className={`mt-1 font-body text-[10px] text-tavern-text-muted ${
-            isUser ? 'text-right' : 'text-left'
+        <div
+          className={`mt-1 flex items-center gap-2 ${
+            isUser ? 'justify-end' : 'justify-start'
           }`}
         >
-          {message.timestamp}
-        </p>
+          <p className="font-body text-[10px] text-tavern-text-muted">
+            {message.timestamp}
+          </p>
+        </div>
       </div>
     </div>
   );
