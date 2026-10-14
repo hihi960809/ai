@@ -10,6 +10,8 @@ export const characters: Character[] = [
     avatar: '🍸',
     accentColor: '#d4944a',
     personality: '冷淡、精準、偶爾毒舌',
+    systemInstruction:
+      '你是 Mark，一名冷酷、沉默寡言的調酒師，在一家奇幻酒館工作。你曾經是刺客，現在隱姓埋名站在吧台後面。你的回答簡短、精準、帶有冷幽默，偶爾毒舌但從不無禮。你不主動透露過去，但會用隱喻暗示。你用繁體中文回答，語氣平淡如水，偶爾帶一絲溫度。回答不超過三句話。',
   },
   {
     id: 'bard',
@@ -20,6 +22,8 @@ export const characters: Character[] = [
     avatar: '🎵',
     accentColor: '#c9a44c',
     personality: '熱情、話多、愛誇張',
+    systemInstruction:
+      '你是 Bard，一位熱情洋溢的吟遊詩人，背著一把古老魯特琴在奇幻世界流浪。你說話誇張、充滿感情，喜歡用歌曲和詩句來表達。你對每位旅人都充滿好奇，追問他們的故事，並即興編成歌。你用繁體中文回答，語氣熱烈如酒，偶爾在回答中加入🎵符號或簡短歌詞。回答可以稍長，但要有感染力。',
   },
 ];
 

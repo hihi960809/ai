@@ -1,10 +1,11 @@
-import { useState, useMemo, useCallback } from 'react';
-import { Users, ScrollText } from 'lucide-react';
+import { useState, useMemo, useCallback, useRef } from 'react';
+import { Users, ScrollText, AlertCircle, X } from 'lucide-react';
 import Header from './components/Header';
 import CharacterCard from './components/CharacterCard';
 import ChatWindow from './components/ChatWindow';
 import MessageInput from './components/MessageInput';
 import { characters, mockMessages, mockBardMessages } from './mockData';
+import { generateReply, resolveApiKey } from './services/gemini';
 import type { Character, Message, ConnectionStatus } from './types';
 
 const initialConversations: Record<string, Message[]> = {
@@ -12,23 +13,12 @@ const initialConversations: Record<string, Message[]> = {
   bard: mockBardMessages,
 };
 
-// Mock auto-replies per character
-const autoReplies: Record<string, string[]> = {
-  mark: [
-    '……酒還沒涼。你倒先開口了。',
-    '我不想聽。但你可以繼續說。',
-    '這杯我請。別問為什麼。',
-    '你看起來比剛才清醒了些。也許是酒的功勞。',
-    '吧台後面的人不問客人來自哪裡。只問——你今晚想忘掉什麼。',
-  ],
-  bard: [
-    '哈哈哈！有意思！這個故事我得記下來！',
-    '喔？你也有故事？來來來，邊喝邊說！',
-    '你知道嗎，這句話讓我想起一首古老的歌……算了，下次再唱！',
-    '旅人，你的眼裡有光。這可是好兆頭！',
-    '乾杯！為今晚的相遇，也為所有未完的故事！',
-  ],
-};
+function makeTimestamp(): string {
+  const now = new Date();
+  return `${String(now.getHours()).padStart(2, '0')}:${String(
+    now.getMinutes()
+  ).padStart(2, '0')}`;
+}
 
 export default function App() {
   const [selectedId, setSelectedId] = useState<string>('mark');
@@ -38,6 +28,9 @@ export default function App() {
   const [status, setStatus] = useState<ConnectionStatus>('connected');
   const [isTyping, setIsTyping] = useState(false);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
+  const [apiKey, setApiKey] = useState<string>(resolveApiKey());
+  const [errorToast, setErrorToast] = useState<string | null>(null);
+  const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const selectedCharacter: Character = useMemo(
     () => characters.find((c) => c.id === selectedId)!,
@@ -46,17 +39,24 @@ export default function App() {
 
   const currentMessages = conversations[selectedId] ?? [];
 
+  const showError = useCallback((msg: string) => {
+    setErrorToast(msg);
+    if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+    errorTimerRef.current = setTimeout(() => setErrorToast(null), 5000);
+  }, []);
+
   const handleSelectCharacter = useCallback((id: string) => {
     setSelectedId(id);
     setShowMobileSidebar(false);
   }, []);
 
+  const handleApiKeyChange = useCallback((key: string) => {
+    setApiKey(key);
+  }, []);
+
   const handleSend = useCallback(
-    (text: string) => {
-      const now = new Date();
-      const timestamp = `${String(now.getHours()).padStart(2, '0')}:${String(
-        now.getMinutes()
-      ).padStart(2, '0')}`;
+    async (text: string) => {
+      const timestamp = makeTimestamp();
 
       const userMsg: Message = {
         id: `u-${Date.now()}`,
@@ -66,40 +66,39 @@ export default function App() {
         timestamp,
       };
 
+      // Build the conversation history including the new user message
+      const history = [...(conversations[selectedId] ?? []), userMsg];
+
       setConversations((prev) => ({
         ...prev,
-        [selectedId]: [...(prev[selectedId] ?? []), userMsg],
+        [selectedId]: history,
       }));
 
-      // Simulate character typing + reply
       setIsTyping(true);
-      const replies = autoReplies[selectedId] ?? autoReplies.mark;
-      const reply = replies[Math.floor(Math.random() * replies.length)];
-      const delay = 1200 + Math.random() * 1500;
 
-      setTimeout(() => {
-        const replyTime = new Date();
-        const replyTimestamp = `${String(replyTime.getHours()).padStart(
-          2,
-          '0'
-        )}:${String(replyTime.getMinutes()).padStart(2, '0')}`;
+      const result = await generateReply(selectedCharacter, history, apiKey);
 
-        const charMsg: Message = {
-          id: `c-${Date.now()}`,
-          characterId: selectedId,
-          sender: 'character',
-          text: reply,
-          timestamp: replyTimestamp,
-        };
+      setIsTyping(false);
 
-        setConversations((prev) => ({
-          ...prev,
-          [selectedId]: [...(prev[selectedId] ?? []), charMsg],
-        }));
-        setIsTyping(false);
-      }, delay);
+      if (result.error) {
+        showError(result.error);
+        return;
+      }
+
+      const charMsg: Message = {
+        id: `c-${Date.now()}`,
+        characterId: selectedId,
+        sender: 'character',
+        text: result.text,
+        timestamp: makeTimestamp(),
+      };
+
+      setConversations((prev) => ({
+        ...prev,
+        [selectedId]: [...(prev[selectedId] ?? []), charMsg],
+      }));
     },
-    [selectedId]
+    [selectedId, selectedCharacter, apiKey, conversations, showError]
   );
 
   const toggleConnection = useCallback(() => {
@@ -113,7 +112,25 @@ export default function App() {
       {/* Ambient background glow */}
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_at_20%_-10%,rgba(212,148,74,0.06),transparent_50%),radial-gradient(ellipse_at_80%_110%,rgba(201,164,76,0.04),transparent_50%)]" />
 
-      <Header status={status} />
+      {/* Error toast */}
+      {errorToast && (
+        <div className="fixed top-20 left-1/2 z-50 flex max-w-md -translate-x-1/2 animate-slide-up">
+          <div className="flex items-start gap-2.5 rounded-lg border border-tavern-danger/40 bg-tavern-card px-4 py-3 shadow-[0_4px_24px_rgba(0,0,0,0.5)]">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-tavern-danger" />
+            <p className="flex-1 font-body text-sm leading-snug text-tavern-text">
+              {errorToast}
+            </p>
+            <button
+              onClick={() => setErrorToast(null)}
+              className="shrink-0 text-tavern-text-muted transition-colors hover:text-tavern-text"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      <Header status={status} onApiKeyChange={handleApiKeyChange} />
 
       {/* Mobile tab switcher */}
       <div className="relative z-10 flex border-b border-tavern-border bg-tavern-surface lg:hidden">

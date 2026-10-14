@@ -6,6 +6,7 @@ export interface Character {
   avatar: string;
   accentColor: string;
   personality: string;
+  systemInstruction: string;
 }
 
 export interface Message {
