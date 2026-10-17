@@ -1,24 +1,34 @@
 import { useEffect, useRef } from 'react';
 import type { Character, Message } from '../types';
 import SpeakButton from './SpeakButton';
+import { TypewriterBubble } from './TypewriterBubble';
 
 interface ChatWindowProps {
   character: Character;
   messages: Message[];
   isTyping: boolean;
+  onTypingComplete: (messageId: string) => void;
 }
 
 export default function ChatWindow({
   character,
   messages,
   isTyping,
+  onTypingComplete,
 }: ChatWindowProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      scrollRef.current.scrollTo({
+        top: scrollRef.current.scrollHeight,
+        behavior,
+      });
     }
+  };
+
+  useEffect(() => {
+    scrollToBottom('smooth');
   }, [messages, isTyping]);
 
   return (
@@ -36,11 +46,32 @@ export default function ChatWindow({
       </div>
 
       <div className="mx-auto flex max-w-3xl flex-col gap-4">
-        {messages.map((msg) => (
-          <MessageBubble key={msg.id} message={msg} character={character} />
-        ))}
+        {messages.map((msg) => {
+          const isCharacterTyping =
+            msg.sender === 'character' && msg.isTyping;
 
-        {/* Typing indicator */}
+          if (isCharacterTyping) {
+            return (
+              <TypewriterBubble
+                key={msg.id}
+                message={msg}
+                character={character}
+                onComplete={() => onTypingComplete(msg.id)}
+                onTick={() => scrollToBottom('auto')}
+              />
+            );
+          }
+
+          return (
+            <MessageBubble
+              key={msg.id}
+              message={msg}
+              character={character}
+            />
+          );
+        })}
+
+        {/* Typing indicator (waiting for API response) */}
         {isTyping && (
           <div className="flex items-end gap-2.5 animate-fade-in">
             <div

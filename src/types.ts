@@ -15,6 +15,7 @@ export interface Message {
   sender: 'user' | 'character';
   text: string;
   timestamp: string;
+  isTyping?: boolean;
 }
 
 export type ConnectionStatus = 'connected' | 'connecting' | 'disconnected';

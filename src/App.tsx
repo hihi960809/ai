@@ -91,6 +91,7 @@ export default function App() {
         sender: 'character',
         text: result.text,
         timestamp: makeTimestamp(),
+        isTyping: true,
       };
 
       setConversations((prev) => ({
@@ -100,6 +101,19 @@ export default function App() {
     },
     [selectedId, selectedCharacter, apiKey, conversations, showError]
   );
+
+  const handleTypingComplete = useCallback((messageId: string) => {
+    setConversations((prev) => {
+      const conv = prev[selectedId];
+      if (!conv) return prev;
+      return {
+        ...prev,
+        [selectedId]: conv.map((m) =>
+          m.id === messageId ? { ...m, isTyping: false } : m
+        ),
+      };
+    });
+  }, [selectedId]);
 
   const toggleConnection = useCallback(() => {
     setStatus((prev) =>
@@ -243,6 +257,7 @@ export default function App() {
             character={selectedCharacter}
             messages={currentMessages}
             isTyping={isTyping}
+            onTypingComplete={handleTypingComplete}
           />
 
           <MessageInput onSend={handleSend} disabled={status !== 'connected'} />
